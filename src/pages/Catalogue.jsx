@@ -3,6 +3,31 @@ import { useNavigate } from "react-router-dom";
 import categoriesData from "../data/response1.json";
 import productData from "../data/response2.json";
 
+/* ========= IMF INDICATOR EXTRACTOR =========
+   Recursively walks response2.json and pulls
+   REAL IMF indicator objects (title, cat, freq, unit, region)
+*/
+const extractIMFIndicators = (node, acc = []) => {
+  if (Array.isArray(node)) {
+    node.forEach((item) => extractIMFIndicators(item, acc));
+  } else if (node && typeof node === "object") {
+    if (
+      node.title &&
+      node.cat &&
+      node.freq &&
+      node.unit &&
+      node.region
+    ) {
+      acc.push(node);
+    }
+
+    Object.values(node).forEach((val) =>
+      extractIMFIndicators(val, acc)
+    );
+  }
+  return acc;
+};
+
 function Catalogue() {
   const navigate = useNavigate();
 
@@ -28,57 +53,87 @@ function Catalogue() {
     }));
   };
 
+  /* ========= DATA PIPELINE ========= */
   const filteredData = useMemo(() => {
-    let filtered = productData.data.filter(
-      (item) => item.dataset === selectedDataset
-    );
+    let rows = [];
 
-    if (
-      selectedCategory !== "Homepage" &&
-      selectedCategory !== "All"
-    ) {
-      filtered = filtered.filter((item) =>
-        item.category.includes(selectedCategory)
-      );
+    /* ---------- IMF ---------- */
+    if (selectedDataset === "IMF") {
+      const imfIndicators = extractIMFIndicators(productData);
+
+      rows = imfIndicators.map((item, index) => ({
+        id: item.id || index,
+        name: item.title,
+        category: item.subCat
+          ? `${item.cat} / ${item.subCat}`
+          : item.cat,
+        range: item.freq,
+        unit: item.unit,
+        coverage: item.region,
+      }));
+
+      if (selectedCategory !== "Homepage") {
+        rows = rows.filter((row) =>
+          row.category?.includes(selectedCategory)
+        );
+      }
     }
 
+    /* ---------- INDIA & STATES ---------- */
+    else {
+      rows = (categoriesData.frequent || []).map((item, index) => ({
+        id: item.id || index,
+        name: item.title,
+        category: item.cat || item.subCat || "—",
+        range: item.freq || "—",
+        unit: item.unit || "—",
+        coverage: item.region || item.db || "India",
+      }));
+
+      if (selectedCategory !== "Homepage") {
+        rows = rows.filter(
+          (row) => row.category === selectedCategory
+        );
+      }
+    }
+
+    /* ---------- SEARCH ---------- */
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.name.toLowerCase().includes(q) ||
-          item.category.toLowerCase().includes(q)
+      rows = rows.filter(
+        (row) =>
+          row.name.toLowerCase().includes(q) ||
+          row.category?.toLowerCase().includes(q)
       );
     }
 
-    return filtered;
+    return rows;
   }, [selectedDataset, selectedCategory, searchQuery]);
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredData.length / itemsPerPage)
+  );
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredData.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredData, currentPage]);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const currentUser = localStorage.getItem("currentUser");
 
+  /* ========= UI (UNCHANGED) ========= */
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-indigo-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center space-x-2">
+      <nav className="bg-indigo-900 text-white px-6 py-4 flex items-center gap-6 sticky top-0 z-50">
+        <div className="flex items-center space-x-2 min-w-fit">
           <div className="w-8 h-8 bg-indigo-700 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold">ID</span>
+            <span className="font-bold">ID</span>
           </div>
           <span className="text-xl font-semibold">indiadatahub.in</span>
         </div>
 
-        <div className="flex-1 max-w-2xl mx-8">
+        <div className="flex-1 flex justify-center">
           <input
             type="text"
             placeholder="Search..."
@@ -87,21 +142,25 @@ function Catalogue() {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-4 py-2 rounded bg-white text-gray-800"
+            className="w-full max-w-2xl px-4 py-2 rounded bg-white text-gray-800"
           />
         </div>
 
-        <div className="flex items-center space-x-6">
-          <a href="#" className="hover:text-indigo-200">Database</a>
-          <a href="#" className="hover:text-indigo-200">Calendar</a>
-          <a href="#" className="hover:text-indigo-200">Help</a>
+        <div className="flex items-center space-x-6 min-w-fit">
+          <span className="hover:text-indigo-200 cursor-pointer">Database</span>
+          <span className="hover:text-indigo-200 cursor-pointer">Calendar</span>
+          <span className="hover:text-indigo-200 cursor-pointer">Help</span>
+
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-indigo-700 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm">
+              <span className="text-sm">
                 {currentUser ? currentUser.charAt(0).toUpperCase() : "U"}
               </span>
             </div>
-            <button onClick={handleLogout} className="text-sm hover:text-indigo-200">
+            <button
+              onClick={handleLogout}
+              className="text-sm hover:text-indigo-200"
+            >
               Logout
             </button>
           </div>
@@ -109,10 +168,10 @@ function Catalogue() {
       </nav>
 
       <div className="flex">
-        <div className="w-64 bg-white border-r border-gray-200 min-h-screen p-4">
+        <div className="w-64 bg-white border-r min-h-screen p-4">
           <button
             onClick={() => toggleCategory("Economic Monitor")}
-            className="flex items-center justify-between w-full text-left font-semibold text-gray-700 mb-2"
+            className="flex items-center justify-between w-full text-left font-semibold text-gray-700 mb-3"
           >
             <span className="flex items-center">
               <span className="mr-2">
@@ -122,37 +181,35 @@ function Catalogue() {
             </span>
           </button>
 
-          <div className="ml-6 mb-4">
-            <select
-              value={selectedDataset}
-              onChange={(e) => {
-                setSelectedDataset(e.target.value);
-                setSelectedCategory("Homepage");
-                setCurrentPage(1);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-sm"
-            >
-              <option value="ECONOMIC">India & States</option>
-              <option value="IMF">IMF</option>
-            </select>
-          </div>
+          <select
+            value={selectedDataset}
+            onChange={(e) => {
+              setSelectedDataset(e.target.value);
+              setSelectedCategory("Homepage");
+              setCurrentPage(1);
+            }}
+            className="w-full mb-4 px-3 py-2 border rounded bg-white text-sm"
+          >
+            <option value="ECONOMIC">India & States</option>
+            <option value="IMF">IMF</option>
+          </select>
 
           {expandedCategories["Economic Monitor"] && (
-            <div className="ml-6 space-y-1">
-              {categoriesData.categories[0].children.map((child) => (
+            <div className="space-y-1">
+              {Object.keys(categoriesData.categories || {}).map((cat) => (
                 <button
-                  key={child.id}
+                  key={cat}
                   onClick={() => {
-                    setSelectedCategory(child.name);
+                    setSelectedCategory(cat);
                     setCurrentPage(1);
                   }}
                   className={`block w-full text-left px-3 py-2 rounded text-sm ${
-                    selectedCategory === child.name
+                    selectedCategory === cat
                       ? "bg-indigo-100 text-indigo-900 font-medium"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  {child.name}
+                  {cat}
                 </button>
               ))}
             </div>
@@ -160,24 +217,27 @@ function Catalogue() {
         </div>
 
         <div className="flex-1 p-6">
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white border rounded-lg min-h-[520px] flex flex-col overflow-hidden">
+            <table className="w-full flex-1">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold">New Releases</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold">
+                    New Releases
+                  </th>
                   <th className="px-4 py-3 text-xs font-semibold">Range</th>
                   <th className="px-4 py-3 text-xs font-semibold">Unit</th>
                   <th className="px-4 py-3 text-xs font-semibold">Coverage</th>
                   <th className="px-4 py-3 text-xs font-semibold">Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {paginatedData.map((item) => (
                   <tr key={item.id} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-4">
                       <div className="font-medium">{item.name}</div>
-                      <div className="text-xs text-blue-600">{item.category}</div>
+                      <div className="text-xs text-blue-600">
+                        {item.category}
+                      </div>
                     </td>
                     <td className="px-4 py-4">{item.range}</td>
                     <td className="px-4 py-4">{item.unit}</td>
@@ -188,29 +248,27 @@ function Catalogue() {
               </tbody>
             </table>
 
-            <div className="bg-gray-50 px-4 py-3 border-t flex justify-between">
+            <div className="px-4 py-3 border-t flex justify-between items-center bg-white">
               <span className="text-sm text-gray-600">
                 Page {currentPage} of {totalPages}
               </span>
-
               <div className="space-x-2">
                 <button
-                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
                   className="px-3 py-1 border rounded disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
                   className="px-3 py-1 border rounded disabled:opacity-50"
                 >
                   Next
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       </div>
