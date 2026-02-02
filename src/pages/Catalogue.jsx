@@ -3,10 +3,7 @@ import { useNavigate } from "react-router-dom";
 import categoriesData from "../data/response1.json";
 import productData from "../data/response2.json";
 
-/* ========= IMF INDICATOR EXTRACTOR =========
-   Recursively walks response2.json and pulls
-   REAL IMF indicator objects (title, cat, freq, unit, region)
-*/
+
 const extractIMFIndicators = (node, acc = []) => {
   if (Array.isArray(node)) {
     node.forEach((item) => extractIMFIndicators(item, acc));
@@ -122,7 +119,6 @@ function Catalogue() {
 
   const currentUser = localStorage.getItem("currentUser");
 
-  /* ========= UI (UNCHANGED) ========= */
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-indigo-900 text-white px-6 py-4 flex items-center gap-6 sticky top-0 z-50">
