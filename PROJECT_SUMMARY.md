@@ -163,21 +163,12 @@ india-data-hub/
 
 ## ✨ Key Features
 
-1. **No TypeScript** - Pure JavaScript as requested
-2. **No Backend** - Static data from JSON files
-3. **localStorage Authentication** - Persistent login
-4. **Responsive Design** - Works on all screen sizes
-5. **Performance Optimized** - Uses React best practices
-6. **Exact UI Match** - Follows provided images precisely
+1. **No Backend** - Static data from JSON files
+2. **localStorage Authentication** - Persistent login
+3. **Responsive Design** - Works on all screen sizes
+4. **Performance Optimized** - Uses React best practices
 
-## 🔒 Security Note
 
-This is a demo application using localStorage for authentication. In production:
-- Use proper backend authentication
-- Implement JWT tokens or session management
-- Add password encryption
-- Use HTTPS
-- Implement CSRF protection
 
 ## 📝 Notes
 
